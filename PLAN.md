@@ -1771,6 +1771,18 @@ Run in this order. Each step says what it proves.
       `*Uspd.tflite` models, no ultrasound section in AFE.cfg. A `mixer` record stream `ultraSound` exists (reports
       2000 Hz x 9 ch x 32 bit) but the HAL refuses it (`Could not open input stream -22`), and **mixer retries every 10 ms
       for ever after the client has gone** (35 % CPU, logd 18 %) until `stop mixer; start mixer`: do not open it.
+- [~] Room loudness and speech (2026-11-03, `roomlevel.c`, feature `room_loudness`, off by default): "Room loudness",
+      the mean square of micAsr over 5 s in dBFS, and "Room speech", the share of the last minute's front end records
+      (afemeta.h) with DNN VAD >= 2, for presence and activity automations.  As TECHO5's "Ambient noise" (5 s, dBFS,
+      sent on 2 dB) plus the speech share, which it does not have.  Own playback (core's flags as `on_sound` reads them,
+      a Drop In's far end, 1 s after any of ours started or stopped, the records' playback flag) left out; a window of
+      more than half of it: the reading held, 12 such windows: unknown; muted: unknown at the window's end.  It runs on
+      the capture thread, which feeds the wake word, so only sums and atomics there: no `core_lock`, no socket (writes
+      block under the lock), no file (`core_muted` opens sysfs per call); the first version did all three, every block
+      or 5 s.  The light thread takes the mute state there and sends.  PC tests only so far
+      (`tests/unit/roomlevel_test.c`, `tests/fake_ha_room.py`).  Not yet on an Echo: the quiet room's level on each Dot,
+      whether 1 s covers the echo canceller's tail after a reply (a capture with kill -TTIN), the speech share of one
+      talker, of a TV, of an empty room; the Android models (no records) see only the loudness.
 - [~] Wi-Fi motion, experimental (2026-10-01, `wifimotion.c`): the receive level of the Wi-Fi radio as a motion sensor.
       donut's driver (`wlan_mt76x8_sdio.ko`, MT7668, gen4m) has CSI commands: `SET_CSI <mode 0/1> <wf 0/1> <frame slot
       0-3> <frame type 0 = beacon>` (argc 2 or 5, band fixed 0, role 1; command 0x4c to the firmware, 8 bytes) and

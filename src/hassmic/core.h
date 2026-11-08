@@ -151,6 +151,14 @@ int  core_led_auto(int set);                     /* LED ring follows the light s
 int  core_led_brightness(int set);               /* 0..100; set >= 0 fixes the level (auto off); -1 reads what the ring shows */
 float core_lux(void);                            /* light sensor in lux as stock reads it (no lock needed); NAN: none */
 int  core_led_has_auto(void);                    /* a light sensor and an engine that follows it: auto brightness offered */
+/* Room loudness and speech (roomlevel.h): off by default; set 0/1, -1 reads.  The last readings: dBFS of the last 5 s,
+ * % of the last minute spoken in; NAN unknown.  No lock for these three */
+int   core_room(int set);
+float core_room_loudness(void);
+float core_room_speech(void);
+/* lock held, about once a second: takes the mute state to the capture thread, and says how many readings there have
+ * been so far (one per 5 s while the feature is on) */
+unsigned core_room_poll(void);
 /* Sound detection (sound.h): off by default.  The events Home Assistant may get, one per sound the model tells apart. */
 int  core_sound(int set);                        /* set: 0/1, or -1 to only read */
 int  core_whispered(void);                       /* the last request: 1 whispered, 0 not, -1 none scored yet, -2 no model

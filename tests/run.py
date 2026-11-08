@@ -33,6 +33,7 @@ TESTS = [
     ("stop-word", [PY, "tests/fake_ha_stop_word.py"]),
     ("esphome-features", [PY, "tests/fake_ha_esphome_features.py"]),
     ("esphome-address", [PY, "tests/fake_ha_esphome_address.py"]),
+    ("room", [PY, "tests/fake_ha_room.py"]),
     ("esphome", [PY, "tests/fake_ha_esphome.py"]),
     ("esphome-buttons", [PY, "tests/fake_ha_esphome_buttons.py"]),
     ("esphome-timers", [PY, "tests/fake_ha_esphome_timers.py"]),

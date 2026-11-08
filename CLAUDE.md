@@ -54,6 +54,8 @@ aioesphomeapi, wyoming, aiosendspin, noiseprotocol, aiohttp):
 .venv/bin/python tests/fake_ha_esphome_features.py #   sound detection (HASSMIC_FAKE_SOUND_WINDOW: 3 s windows), Wi-Fi motion
 .venv/bin/python tests/fake_ha_esphome_buttons.py  #   runs cancelled while HA thinks or streams, the "Button" event entity
 .venv/bin/python tests/fake_ha_esphome_address.py  #   a new address: links closed, mDNS announced again
+.venv/bin/python tests/fake_ha_room.py        # room loudness and speech (roomlevel.c): the sensors from a capture with the
+                                             # front end's records, muted unknown, on and off from the page
 .venv/bin/python tests/fake_ha_end.py         # the end of a request heard on the Echo (micend.c): a talker, dishes as loud
                                              # (no speech in the front end's records written into the capture), quieter
                                              # voices on another pitch; end of audio, not an abort; the gain left alone;
@@ -275,6 +277,12 @@ No model `#ifdef`s in shared code: new differences become a board field, a `devi
 - **Sound packs** (`soundpack.c`, `soundpack.h`): sets of the Sounds card's sounds in `state/sound-packs/<id>/` (`name`,
   `<sound>.wav`), `/api/sound-pack`, page `packsCard`, a `.soundpack` file = a tar of `pack.json` + WAVs (`web/tar.js`).
   A pack is a whole set; 16 packs, 30 MB, 32 MB left on the partition (`HASSMIC_SOUNDPACK_MAX`, `_FREE_MIN` for tests).
+- **Room loudness and speech (`roomlevel.c`, `roomlevel.h`)**: feature `room_loudness` (off): the sensors "Room
+  loudness" (micAsr's mean square over 5 s, dBFS) and "Room speech" (% of the last minute's front end records with
+  DNN VAD >= 2; unknown without records: the PC, Android's HALs).  Fed by the capture thread (`main.c` `room_feed`),
+  own playback left out by on_sound's flags + `ROOM_TAIL_MS`.  That thread feeds the wake word: there it only does sums
+  and atomics (no `core_lock`, socket or file: `core_muted` opens sysfs); the light thread in `proto_esphome.c` brings the
+  mute state (`core_room_poll`) and sends what `rl_send` says.
 - **Whisper detection (`whisper.h`)**: `whisper_pryon.c` (libpryon `WhisperApi_*`, one detector per request fed from the
   start of streaming, end of utterance on HA's VAD end (`core_mic_off`), result into the ESPHome binary sensor "Last
   request whispered" before STT ends, for the agent's prompt template; `docs/re-whisper.md`) or `whisper_none.c` (host

@@ -4,6 +4,13 @@ What changed for people using the Echo, newest first. Details and measurements a
 
 ## 2026-11-08
 
+- **How loud the room is, and how much is said in it.** A new feature on the settings page, "Room loudness" (off by
+  default), gives Home Assistant two sensors: "Room loudness", how loud the room was over the last 5 seconds in dBFS
+  (not a calibrated sound level: compare it with itself), and "Room speech", how much of the last minute someone was
+  talking, from Amazon's own speech detector in the Echo. For automations on whether a room is in use. Sounds the Echo
+  makes itself are left out; with the microphones off both read unknown. On an Echo Show or Echo Input "Room speech" reads unknown.
+  Only the two numbers leave the Echo, never sound.
+
 - **Wake word in Home Assistant: answering a question now works.** When the assistant asked something back
   ("which light?"), the Echo opened the microphone but asked Home Assistant to wait for a wake word first, so the
   answer was ignored. A follow-up question now goes without that wait, as with the Echo's own wake word, and the

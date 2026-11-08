@@ -55,6 +55,7 @@
 #include "micdenoise.h"
 #include "earsup.h"
 #include "afemeta.h"
+#include "roomlevel.h"
 #include "micend.h"
 #include "micgain.h"
 #include "wordtail.h"
@@ -1009,6 +1010,42 @@ int core_sound(int set)
         fprintf(stderr, "sound detection: switched %s\n", set ? "on" : "off");
     }
     return atomic_load(&sound_want);
+}
+
+/* Room loudness and speech (roomlevel.h).  The capture thread feeds the wake word, so here it only does sums and reads
+ * atomics, feature on or off: no core_lock, no socket and no file.  Home Assistant's socket writes block under the lock,
+ * and core_muted() opens a sysfs file per call (buttons.c latch_read).  proto_esphome.c's light thread, once a second,
+ * brings it the mute state (core_room_poll) and sends the readings.  What the Echo plays is left out by on_sound's
+ * flags, plus a call's far end; and ROOM_TAIL_MS after anything of ours started or stopped: the room's reverb and the
+ * echo canceller's tail.  1 s is not measured yet; a capture of a reply's end (kill -TTIN) would tell */
+#define ROOM_TAIL_MS 1000
+static atomic_int room_want, room_muted;
+static atomic_uint room_readings;
+static _Atomic float room_db = NAN, room_speech = NAN;
+int core_room(int set) { if (set >= 0) atomic_store(&room_want, !!set); return atomic_load(&room_want); }
+float core_room_loudness(void) { return atomic_load(&room_db); }
+float core_room_speech(void) { return atomic_load(&room_speech); }
+unsigned core_room_poll(void)
+{
+    if (atomic_load(&room_want)) atomic_store(&room_muted, core_muted());
+    return atomic_load(&room_readings);
+}
+
+static void room_feed(struct roomlevel *r, int *running, const void *pcm, size_t n)    /* capture thread */
+{
+    if (atomic_load(&room_want) != *running) {
+        *running = !*running; rl_reset(r);
+        atomic_store(&room_db, NAN); atomic_store(&room_speech, NAN);
+    }
+    if (!*running) return;
+    long long now = mono_ms();
+    int own = atomic_load(&alarm_on) || atomic_load(&music_on) || atomic_load(&tts_on) || atomic_load(&earcon_sounding)
+              || atomic_load(&sounds_pending) || now < atomic_load(&earcon_heard_until)
+              || now - atomic_load(&own_sound_ms) < ROOM_TAIL_MS || atomic_load(&dropin_live);
+    if (rl_feed(r, pcm, n, own, atomic_load(&room_muted))) {
+        atomic_store(&room_db, r->db); atomic_store(&room_speech, r->speech_pct);
+        atomic_fetch_add(&room_readings, 1);    /* after them: the light thread goes by this one */
+    }
 }
 
 static void on_sound(const char *const *types, int n)    /* detector thread */
@@ -3186,6 +3223,8 @@ static void *capture_thread(void *arg)
     FILE *dump = NULL;
     int sound_running = 0;                  /* the decoder is open: only this thread opens, feeds and closes it */
     int whisper_on = 0;                     /* a whisper detector takes this request's audio */
+    static struct roomlevel room;           /* only this thread uses it (room_feed) */
+    int room_running = 0;
     (void)arg;
     while (!atomic_load(&quit)) {
         const void *pcm; int n = cap_read(&pcm);
@@ -3240,6 +3279,7 @@ static void *capture_thread(void *arg)
             } else { sound_close(); sound_running = 0; }
         }
         if (sound_running) sound_feed(pcm, n / 2);
+        room_feed(&room, &room_running, pcm, n / 2);
         if (atomic_load(&whisper_last) != -2) {     /* a model: what streams to the pipeline is one request */
             int s = atomic_load(&streaming);
             if (s && !whisper_on && atomic_load(&whisper_enabled)) {             /* the position lines it up with the capture dump's */

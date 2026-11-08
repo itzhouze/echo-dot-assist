@@ -37,6 +37,8 @@
  *   debug access     a switch opens adb over Wi-Fi for 30 min (adbwifi.c); only taken over the connection with the key
  *   wifi motion      experimental, off by default: a switch, a motion binary sensor, its sensitivity (wifimotion.c);
  *                    listed only where the Wi-Fi driver can do it
+ *   room loudness    off by default: the sensors "Room loudness" (dBFS) and "Room speech" (%) (roomlevel.h), for
+ *                    presence and activity automations; unknown while the mics are off
  *   online updates   an update entity with the newest build on the channel picked on the settings page, and an
  *                    install button (update.c); install only over the connection with the key
  *   request text     the text sensors "Last heard" and "Last reply": what speech-to-text understood and what the
@@ -87,6 +89,7 @@
 #include "clock.h"
 #include "update.h"
 #include "wifimotion.h"
+#include "roomlevel.h"
 #include "net.h"
 #include "netio.h"
 #include "statefile.h"
@@ -131,7 +134,7 @@ enum { KEY_NOISE = 2, KEY_MIC_LEVEL, KEY_MULT, KEY_MUTE, KEY_WAKE_SOUND, KEY_SEN
        KEY_TIMER_RINGING, KEY_TIMER_NAMES, KEY_DROPIN_SERVICE, KEY_DROPIN_STATE, KEY_DROPIN_PEER, KEY_DROPIN_END, KEY_RESTART,
        KEY_DROPIN_RESULT, KEY_TIMER_STOP, KEY_BUTTON, KEY_LIGHT, KEY_ASSIST_VOLUME, KEY_SOUNDS_VOLUME, KEY_TIMER_VOLUME,
        KEY_CALL_VOLUME, KEY_WAKE, KEY_RING_FILL, KEY_RING_ROTATION, KEY_RING_LEDS, KEY_LAST_HEARD, KEY_LAST_REPLY,
-       KEY_NEXT_TIMER, KEY_NEXT_TIMER_NAME, KEY_NEXT_TIMER_LENGTH, KEY_SCR_AUTO, KEY_SCR_LEVEL, KEY_SCR_ADJUST };
+       KEY_NEXT_TIMER, KEY_NEXT_TIMER_NAME, KEY_NEXT_TIMER_LENGTH, KEY_SCR_AUTO, KEY_SCR_LEVEL, KEY_SCR_ADJUST, KEY_ROOM_LOUDNESS, KEY_ROOM_SPEECH };
 enum { MP_KEY = 1, MP_IDLE = 1, MP_PLAYING = 2, MP_CMD_STOP = 2, MP_CMD_MUTE = 3, MP_CMD_UNMUTE = 4 };
 #define MEDIA_RATE 48000        /* what we ask Home Assistant to transcode announcements and media to: WAV mono s16 */
 
@@ -412,6 +415,11 @@ static void send_setting(int key)       /* lock held */
     case KEY_WHISPERED:                 /* unknown until a request has been scored */
         { int w = core_whispered(); if (w != -2) { pb_uint(&b, 2, w == 1); pb_uint(&b, 3, w < 0); send_state(BINARY_SENSOR_STATE, &b); } }
         break;
+    case KEY_ROOM_LOUDNESS: case KEY_ROOM_SPEECH: {    /* unknown: muted, a minute of music, no records (speech) */
+        float v = key == KEY_ROOM_LOUDNESS ? core_room_loudness() : core_room_speech();
+        if (isnan(v)) pb_uint(&b, 3, 1); else pb_float(&b, 2, v);
+        send_state(SENSOR_STATE, &b);
+    } break;
     case KEY_WIFI_MOTION:               /* unknown while switched off */
         if (wifimotion_present()) { int m = wifimotion_motion(); pb_uint(&b, 2, m > 0); pb_uint(&b, 3, m < 0); send_state(BINARY_SENSOR_STATE, &b); }
         break;
@@ -506,6 +514,26 @@ static void send_sensor(int key, float v)   /* lock held */
  * subscribes and when it is set; auto brightness itself works the same. */
 static float sent_lux = NAN; static int sent_level = -1; static time_t sent_at, level_at;     /* lock held */
 
+/* Room loudness and speech (roomlevel.h): a reading every 5 s, sent as rl_send says (2 dB, 5 points or from/to 0 at once,
+ * any move after a minute), so HA's history gets what moved, not every window's dB of flicker.  From the light thread,
+ * never from the capture thread that makes them: a socket write can block.  One sent value for all clients, as the
+ * light sensor's (lock held) */
+static float room_sent[2] = { NAN, NAN }; static int room_since[2]; static unsigned room_seen;
+
+static void room_readings(void)         /* lock held: once a second */
+{
+    unsigned n = core_room_poll(), fresh = n - room_seen;
+    float now[2] = { core_room_loudness(), core_room_speech() };
+    room_seen = n;
+    if (!fresh || !listed(KEY_ROOM_LOUDNESS)) return;
+    for (int i = 0; i < 2; i++) {
+        room_since[i] += (int)fresh;
+        if (!rl_send(room_sent[i], now[i], room_since[i], i ? 5 : 2, i)) continue;
+        room_sent[i] = now[i]; room_since[i] = 0;
+        send_setting(i ? KEY_ROOM_SPEECH : KEY_ROOM_LOUDNESS);
+    }
+}
+
 static void *light_thread(void *arg)
 {
     (void)arg;
@@ -515,6 +543,7 @@ static void *light_thread(void *arg)
         pthread_mutex_lock(&core_lock);
         int any = 0, level = core_led_brightness(-1);
         for (int i = 0; i < MAX_CLIENTS; i++) any |= clients[i].fd >= 0 && clients[i].states;
+        room_readings();
         if (any) {                                              /* a new subscriber gets them from send_light_states */
             float d = fabsf(lux - sent_lux);
             int report = settings_on("light_sensor");
@@ -616,6 +645,7 @@ static int listed(int key)
     case KEY_LED_AUTO: return have_auto;
     case KEY_SCR_AUTO: case KEY_SCR_LEVEL: case KEY_SCR_ADJUST: return settings_find("screen_brightness_auto") != NULL;
     case KEY_LUX: return have_light && settings_on("light_sensor");
+    case KEY_ROOM_LOUDNESS: case KEY_ROOM_SPEECH: return settings_on("room_loudness");
     case KEY_LIGHT: return ring_custom();
     case KEY_RING_FILL: case KEY_RING_ROTATION: case KEY_RING_LEDS: return ring_per_led();
     case KEY_CALL_VOLUME: if (!(dropin_running() && settings_on("drop_in"))) return 0;    /* calls only with Drop In */
@@ -703,6 +733,14 @@ static void send_setting_entities(void)
           pb_str(&b, 3, "Wi-Fi motion sensitivity (experimental)"); pb_str(&b, 5, "mdi:tune");
           pb_float(&b, 6, WIFIMOTION_SENS_MIN); pb_float(&b, 7, WIFIMOTION_SENS_MAX); pb_float(&b, 8, 1); pb_uint(&b, 10, 1); pb_uint(&b, 12, 2);
           send_msg(LIST_NUMBER, &b); }
+    }
+    /* Room loudness and speech (roomlevel.h): no device class, as HA's sound_pressure wants dB SPL and this is not
+     * calibrated; measurement, so HA keeps long-term statistics of both */
+    if (listed(KEY_ROOM_LOUDNESS)) {
+        { PB(b, 192); pb_str(&b, 1, "room_loudness"); pb_fixed32(&b, 2, KEY_ROOM_LOUDNESS); pb_str(&b, 3, "Room loudness");
+          pb_str(&b, 5, "mdi:ear-hearing"); pb_str(&b, 6, "dBFS"); pb_uint(&b, 7, 0); pb_uint(&b, 10, 1); send_msg(LIST_SENSOR, &b); }
+        { PB(b, 192); pb_str(&b, 1, "room_speech"); pb_fixed32(&b, 2, KEY_ROOM_SPEECH); pb_str(&b, 3, "Room speech");
+          pb_str(&b, 5, "mdi:account-voice"); pb_str(&b, 6, "%"); pb_uint(&b, 7, 0); pb_uint(&b, 10, 1); send_msg(LIST_SENSOR, &b); }
     }
     /* Timers: "binary_sensor.<node>_timer_ringing" still on a minute after it came on = nobody heard it, for an
      * automation that announces it elsewhere.  The names (or the length of a timer without one) are a diagnostic beside
@@ -1556,6 +1594,13 @@ static void on_va_set_config(const unsigned char *p, const unsigned char *end)
 }
 
 /* returns 0 to close the connection */
+static void send_room_states(void)      /* lock held: what there is now, to a new subscriber */
+{
+    if (!listed(KEY_ROOM_LOUDNESS)) return;
+    room_sent[0] = core_room_loudness(); room_sent[1] = core_room_speech(); room_since[0] = room_since[1] = 0;
+    send_setting(KEY_ROOM_LOUDNESS); send_setting(KEY_ROOM_SPEECH);
+}
+
 /* lock held: every setting's state, to a client that subscribed (and after the web page changed one) */
 static void send_all_settings(void)
 {
@@ -1571,6 +1616,7 @@ static void send_all_settings(void)
         send_setting(KEY_NEXT_TIMER_NAME); send_setting(KEY_NEXT_TIMER_LENGTH); send_setting(KEY_NEXT_TIMER);
         send_setting(KEY_DROPIN_PEER); send_setting(KEY_DROPIN_STATE);
         send_setting(KEY_LAST_HEARD); send_setting(KEY_LAST_REPLY);
+        send_room_states();
         send_setting(KEY_ASSIST_VOLUME); send_setting(KEY_SOUNDS_VOLUME); send_setting(KEY_TIMER_VOLUME); send_setting(KEY_CALL_VOLUME);
         send_light_states();
 }
