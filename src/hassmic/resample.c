@@ -81,6 +81,13 @@ void gain_glide(char *dst, const char *src, size_t bytes, unsigned per_s, float 
     if (bytes & 1) dst[bytes - 1] = src[bytes - 1];
 }
 
+float music_duck_gain(int db)
+{
+    if (db <= 0) return 1;
+    if (db >= MUSIC_DUCK_MAX_DB) return 0;
+    return powf(10.0f, -(float)db / 20.0f);
+}
+
 void music_duck(int16_t *s, size_t frames, unsigned rate, float *g, float target)
 {
     const float k = 1.0f / (0.030f * (float)rate);

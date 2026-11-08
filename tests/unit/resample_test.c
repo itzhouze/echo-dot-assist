@@ -159,6 +159,7 @@ static void servo(double ppm)
 static void duck(void)
 {
     static int16_t s[R * 2]; float g = 1; int smooth = 1, prev = 16000;
+    const float DUCK = 1.0f / 6;
     for (size_t i = 0; i < R * 2; i++) s[i] = 16000;
     music_duck(s, R / 2, R, &g, DUCK);                                  /* 500 ms down */
     for (size_t i = 0; i < R / 2; i++) { if (abs(s[2 * i] - prev) > 12) smooth = 0; prev = s[2 * i]; }
@@ -172,6 +173,28 @@ static void duck(void)
     int16_t t[4] = { 123, -456, 32767, -32768 };
     music_duck(t, 2, R, &g, 1);
     check(g == 1 && t[0] == 123 && t[1] == -456 && t[2] == 32767 && t[3] == -32768, "music_duck: back at 1, the samples left as they are");
+}
+
+/* The setting music_duck (dB) as a gain: 0 leaves the music alone, the top is silence, between 10^(-dB/20), and each
+ * step down is quieter than the last.  The default is the old fixed sixth within half a dB.  Silence is exactly 0, glided
+ * into without a step and out of again: the stream goes on, so Sendspin stays in sync */
+static void duck_setting(void)
+{
+    int ordered = 1;
+    for (int db = 1; db <= MUSIC_DUCK_MAX_DB; db++) if (!(music_duck_gain(db) < music_duck_gain(db - 1))) ordered = 0;
+    check(music_duck_gain(0) == 1 && music_duck_gain(-5) == 1 && ordered, "music_duck_gain: 0 dB leaves it, every dB more is quieter");
+    check(music_duck_gain(MUSIC_DUCK_MAX_DB) == 0 && music_duck_gain(MUSIC_DUCK_MAX_DB + 10) == 0 &&
+          music_duck_gain(MUSIC_DUCK_MAX_DB - 1) > 0, "music_duck_gain: the top is silence (exactly 0), one step under it is not");
+    check(fabs(music_duck_gain(20) - 0.1) < 1e-6 && fabs(music_duck_gain(6) - 0.5012) < 1e-3, "music_duck_gain: 20 dB is a tenth, 6 dB about a half");
+    check(fabs(20 * log10(music_duck_gain(MUSIC_DUCK_DEFAULT_DB) / (1.0 / 6))) < 0.5, "music_duck_gain: the default is the old sixth within half a dB");
+
+    static int16_t s[R * 2]; float g = 1; int smooth = 1, prev = 16000;
+    for (size_t i = 0; i < R * 2; i++) s[i] = 16000;
+    music_duck(s, R / 2, R, &g, music_duck_gain(MUSIC_DUCK_MAX_DB));    /* 500 ms into silence */
+    for (size_t i = 0; i < R / 2; i++) { if (abs(s[2 * i] - prev) > 40) smooth = 0; prev = s[2 * i]; }
+    check(smooth && g == 0 && s[R - 2] == 0 && s[R - 1] == 0, "music_duck to silence: glided without a click, then exactly 0");
+    music_duck(s + R, R / 2, R, &g, 1);                                 /* and back */
+    check(g == 1 && s[2 * R - 2] == 16000 && s[2 * R - 1] == 16000, "music_duck from silence: back at full level");
 }
 
 /* After a snap: what it missed by (the Echo Show 5: -4.8 ms a second after a stream's start) is no drift.  The drift
@@ -196,6 +219,7 @@ int main(void)
     resampler();
     hold();
     duck();
+    duck_setting();
     servo(-350); servo(350); servo(0); servo(-1500);
     return fails ? 1 : 0;
 }

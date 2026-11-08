@@ -2826,6 +2826,17 @@ Run in this order. Each step says what it proves.
       straight from MainVolume (an update keeps the number).  Echo Show 5 (2026-11-02, the update pushed): 45 kept,
       index 14 -> 11; keys 0..100 gave indices 0, 5, 8, 8, 11, 12, 15, 20, 23, 26, 30 as the curve says.  Not
       measured by ear or mic (no Dot beside it for tools/vol-curve.py).  The Dot 3's curve is still the Dot 2's.
+- [x] Music under the assistant: the duck is a setting (2026-11-08, Echo Dot 3 on top of a kitchen cupboard, loud music:
+      "Alexa, lauter" answered "Vielen Dank." twice).  `music_duck` (settings.c, Sound, exported, page only) in dB, 0..40,
+      16 by default; `music_duck_gain` (resample.c): 0 -> 1, 40 -> exactly 0, else 10^(-dB/20).  It was a fixed `DUCK`
+      of 1/6 (-15.6 dB; the default is 16 dB, 0.4 dB under it).  Read by `sendspin.c` and `a2dp.c` through
+      `core_duck_gain()` (main.c: `core_state() != IDLE`).  Not started at the wake word: `trigger()` runs only after
+      the arbitration round (arb.c), so the Echos that lose keep playing, and the glide (30 ms) starts with the pipeline;
+      the first part of a command spoken inside the window (150-1000 ms) is still over full music.  **Open:** starting the
+      duck at the wake word on the Echo that is likely to win (its own score first in the round), and giving back the
+      duck on the losers when they lose; not measured: how much the mic's SNR gains per dB on a Dot 3 on a cupboard
+      (`tools/mic-compare.py` with music playing would say).  Tests: `make unit-resample` (gain per dB, silence
+      exactly 0, glide without a click, back from silence), `fake_web.py` (setting: default, range, saved, refused).
 - [ ] A volume curve of its own for every model (2026-11-06; even volume steps lean on it as separate volumes do).
       `board.volume_curve` is required now: each board.c names one, `board_vol_dot2` (volcurve.c, measured on the Dot 2)
       standing in where none is measured, and `make unit-volcurve` prints a `todo` line per such model;

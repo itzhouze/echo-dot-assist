@@ -533,6 +533,15 @@ One source at a time, the newest wins: a phone starting over Bluetooth pauses Mu
 Assistant starting on the Echo pauses the phone. The voice assistant ducks both. "<wake word>, stop" pauses either,
 and the action button pauses and resumes.
 
+**Music while the assistant is active** (settings page, Sound): how far the voice assistant turns that music down from
+the moment the Echo starts listening until its reply is spoken. Louder music reaches the microphone through the Echo's
+own speaker, and a little of it always gets through its echo canceller: if loud music drowns out your commands, turn
+it down further. 0 dB leaves the music alone, 40 dB (all the way right) silences it for that time; it goes on playing
+underneath and comes back at once and without a click. 16 dB by default. It starts when the Echo has decided that it
+answers, not at the wake word: with several Echos (see "Several Echos") they first agree on one, so the music in the
+other rooms is not dipped by every "Alexa". Only music from Music Assistant and from a phone over Bluetooth is turned
+down; Home Assistant's own announcements and "Play media" are not.
+
 - **Music Assistant** finds the Echo by itself (Sendspin player). Pair it with the Echo's token: shown at the end of
   `scripts/setup.sh`, and as the diagnostic entity "Sendspin pairing token" in Home Assistant (disabled by default).
   Steps: the model's page, "Optional: Music Assistant". When Music Assistant restarts, the Echo announces itself again

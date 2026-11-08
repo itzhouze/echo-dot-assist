@@ -35,11 +35,19 @@ double rate_servo(struct rate_servo *s, double err_us, double dt_s);   /* err_us
 double rate_servo_snap(struct rate_servo *s);   /* after a jump in the schedule: the error starts from 0, the drift is
                                                    left alone for SERVO_HOLD_S (what the snap left over is no drift); the step */
 
-/* Stereo s16 turned down to DUCK (a sixth, -15.6 dB) while a request runs, glided into and out of with a time constant
- * of 30 ms, frame by frame: a step from one block to the next clicked as listening started and ended.  *g is the
- * stream's gain now (start at 1); at 1 and target 1 the samples are left as they are. */
-#define DUCK (1.0f / 6)
+/* Stereo s16 turned down to target (music_duck_gain of the setting music_duck) while a request runs, glided into and out
+ * of with a time constant of 30 ms, frame by frame: a step from one block to the next clicked as listening started and
+ * ended.  *g is the stream's gain now (start at 1); at 1 and target 1 the samples are left as they are.  Target 0 is
+ * silence: the stream keeps running (Sendspin's sync, the A2DP link) with nothing in it. */
 void   music_duck(int16_t *s, size_t frames, unsigned rate, float *g, float target);
+
+/* How far the music is turned down while the assistant listens, thinks and speaks (setting music_duck, in dB).  It was
+ * a fixed sixth (-15.6 dB) up to 2026-11-08; the default is the nearest whole dB.  0 leaves the music alone, the top
+ * (MUSIC_DUCK_MAX_DB) is silence, in between 10^(-db/20): 40 dB would be 1/100, which a quiet kitchen still hears, so
+ * the last step is a true zero rather than a very small number. */
+#define MUSIC_DUCK_DEFAULT_DB 16
+#define MUSIC_DUCK_MAX_DB 40
+float  music_duck_gain(int db);
 
 /* s16 bytes copied at a gain glided towards target with the duck's 30 ms time constant, sample by sample (`per_s`:
  * samples a second, rate x channels; the buffers the backends get are cut at whole samples, not frames): a volume made

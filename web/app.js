@@ -241,6 +241,7 @@ const HELP = {
   timer_stop_any: { help: 'While a timer rings, whatever you say after the wake word stops it. That goes for any language and however you put it ("Alexa, stop the timer", "Alexa, Ruhe"). Without it only "stop" does, and "stop the timer" goes to Home Assistant, which has forgotten the finished timer and says none is running. The cost: a question during a ring ("how long is left on the pasta timer?") is not answered, it only stops the ring. Off by default.' },
   equalizer_bass: { ha: true }, equalizer_mid: { ha: true }, equalizer_treble: { ha: true },
   speaker_gain: { help: 'Makes the Echo\'s own speaker louder at every volume, for an Echo that is too quiet at full volume. It raises the amplifier stage in front of the speaker, which a stock Echo leaves at +0 dB (an Echo Dot 3\'s amplifier has only 2 dB more to give; an Echo Show 5 goes in steps of 1.5 dB, the nearest one to what you pick). Owners of an Echo Dot 2 heard +6 dB loud and clean at full volume; above that, loud music near full volume can distort, and a speaker that plays distorted for long can be damaged. Raise it a step at a time and turn it down at the first crackle. The 3.5 mm jack and Bluetooth speakers are not affected. An Echo Show 8 (1st gen) is loud already at +0 dB and goes down to −6 dB for that; a 2nd gen goes up to +9 dB, below where its amplifier distorts. Default +0 dB.' },
+  music_duck: { step: 2, ends: ['Music keeps playing as is', 'Silent meanwhile'], help: 'How far the music is turned down while the assistant is active: from the moment the Echo starts listening until its reply has been spoken. Only music from Music Assistant and from a phone over Bluetooth is turned down, and only on the Echo that answers: with several Echos, it waits until they have agreed which one it is, so the music in the rest of the house keeps playing. All the way left leaves the music as it is; the more to the right, the quieter; all the way right turns it silent for that time (it goes on playing underneath and comes back by itself). Turn it up if loud music drowns out your commands: the Echo hears you through its own speaker, and a little of the music always gets through its echo canceller. Default −16 dB, what the Echo did before this setting existed (about −15.6 dB).' },
   even_volume: { help: 'Makes every step of the volume the same: each point is 0.5 dB, each press of the volume buttons 5 dB, from 1 (quiet, about 50 dB under full) to 100 (as loud as before). Without it the Echo plays a volume as a stock Echo does, where most of the change happens at one end: on an Echo Show the bottom half covers more than twice the range of the top half, and a step of one point often does nothing at all. The Echo keeps its own volume setting at the nearest step above, and turns the sound down the rest of the way itself. 0 is silent either way. A Bluetooth speaker that sets its own volume still does. Exported with the settings. On by default.' },
   led_auto_brightness: { ha: true, help: 'The ring dims and brightens with the room, from the Echo\'s light sensor and Amazon\'s own curve, as on a stock Echo.' },
   led_brightness: { ha: true, help: 'A fixed brightness for the ring. Setting one turns auto brightness off.' },
@@ -417,6 +418,7 @@ const SUB = {
   timer_sound: 'What a finished timer plays',
   timer_stop_any: 'Anything said after the wake word stops the ring',
   speaker_gain: 'For an Echo too quiet at full volume',
+  music_duck: 'How much the music gives way to the assistant',
   even_volume: 'Each volume step as big as the next',
   led_auto_brightness: 'Follows the room\'s light, as on a stock Echo',
   led_brightness: 'A fixed level; turns auto brightness off',
@@ -473,6 +475,7 @@ const settingValue = (name) => { const s = state.settings.find((x) => x.name ===
 const label = (s) => { const t = s.label.replace(/ \(experimental\)$/, '').replace(/^Equalizer /, '').replace(' with other Echos', ''); return t[0].toUpperCase() + t.slice(1); };
 const fmt = (s, v) => {
   if (s.name === 'timer_ring') return !v ? 'until stopped' : v < 60 ? `${v} s` : `${Math.floor(v / 60)} min${v % 60 ? ` ${v % 60} s` : ''}`;
+  if (s.name === 'music_duck') return !v ? 'Not turned down' : v >= s.max ? 'Silent' : `−${v} dB · ${v <= 8 ? 'a little' : v <= 20 ? 'clearly' : 'a lot'}`;
   if (s.unit === 'dB') return `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)} dB`;
   if (s.unit === 'dBFS') return `${v < 0 ? '−' : ''}${Math.abs(v)} dBFS`;
   return s.unit ? `${v} ${s.unit}` : String(v);
@@ -977,7 +980,10 @@ function control(s, prefix = 's-') {
     const out = h('output', { for: id });
     const paint = () => { r.style.setProperty('--p', `${((r.value - s.min) * 100) / (s.max - s.min)}%`); out.textContent = fmt(s, +r.value); };
     r.oninput = paint; r.onchange = () => set(s.name, r.value);
-    return { el: h('div', { class: 'slider' }, r, out), update: (x) => { if (!r.matches(':active')) { r.value = x.value; paint(); } } };     // not while dragging
+    const ends = (HELP[s.name] || {}).ends;                     // words under the two ends of the track
+    const el = h('div', { class: 'slider' + (ends ? ' with-ends' : '') }, r, out,
+      ends ? h('div', { class: 'ends' }, h('span', {}, ends[0]), h('span', {}, ends[1])) : null);
+    return { el, update: (x) => { if (!r.matches(':active')) { r.value = x.value; paint(); } } };     // not while dragging
   }
   const names = CHOICE_NAMES[s.name] || {}, modes = (HELP[s.name] || {}).modes;
   if (modes) {                          // choices worth weighing: a small card each, what each gives and costs one click away

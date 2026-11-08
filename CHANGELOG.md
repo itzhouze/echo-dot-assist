@@ -4,6 +4,13 @@ What changed for people using the Echo, newest first. Details and measurements a
 
 ## 2026-11-08
 
+- **Music while the assistant is active: how far it is turned down is a setting now.** The Echo turns Music Assistant
+  and phone music down while it listens, thinks and speaks. That was always 15.6 dB, which loud music still drowns
+  a command in. **Music while the assistant is active** (settings page, Sound) sets it from 0 dB (the music is left
+  alone) to 40 dB (silent: the music goes on underneath and is back when the reply is done), 16 dB by default as before.
+  It still starts only when the Echo has decided that it answers, so with several Echos the music in the other rooms keeps
+  playing while they agree which one you meant. It is exported, so "Make like this Echo" and the compare table carry it.
+
 - **Wake word in Home Assistant: answering a question now works.** When the assistant asked something back
   ("which light?"), the Echo opened the microphone but asked Home Assistant to wait for a wake word first, so the
   answer was ignored. A follow-up question now goes without that wait, as with the Echo's own wake word, and the

@@ -298,7 +298,7 @@ static void *player_thread(void *arg)
         }
         n = rs_run(&rs, (const int16_t *)pcm, frames, step, out);
         if (atomic_load(&player_muted)) memset(out, 0, n * FRAME);
-        else music_duck(out, n, RATE, &duck_g, core_state() != IDLE ? DUCK : 1);          /* under the voice assistant */
+        else music_duck(out, n, RATE, &duck_g, core_duck_gain());          /* under the voice assistant */
         music_write(out, n * FRAME);
         rate_sum += step - 1; rate_n++;
         if (raw_us() - stat_t > 10000000) {

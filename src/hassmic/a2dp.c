@@ -602,7 +602,7 @@ static void *player(void *arg)
             if (bt_open(rr, 2)) { usleep(200000); continue; }
             open = 1; rate = rr; fprintf(stderr, "a2dp: output open, %u Hz\n", rr);
         }
-        music_duck(buf, out, rr, &duck_g, core_state() != IDLE ? DUCK : 1);       /* under the voice assistant */
+        music_duck(buf, out, rr, &duck_g, core_duck_gain());       /* under the voice assistant */
         while (bt_queued_us() > MIXER_US) usleep(5000);
         for (size_t i = 0; i < 2 * out; i++) { int v = buf[i] < 0 ? -buf[i] : buf[i]; if (v > peak) peak = v; }
         if (out && bt_write(buf, out * 4) < 0) fprintf(stderr, "a2dp: mixer write failed\n");   /* 0: a frame or two held back */

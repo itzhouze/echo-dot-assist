@@ -103,6 +103,8 @@ int  core_wake_sound(int set);                   /* same convention: the wake so
 int  core_sound_on(int s, int set);              /* sounds.h's sound has its switch on: set 0/1, or -1 to only read */
 int  core_wake_in_request(int set);              /* the request's audio from the wake word on, not after it; -1 reads */
 int  core_end_of_request(int set);               /* the end of a request heard on the Echo (micend.h: MICEND_*), -1 reads */
+int  core_music_duck(int set);                   /* dB the music is turned down while a request runs, 0 not at all, MUSIC_DUCK_MAX_DB silent; -1 reads */
+float core_duck_gain(void);                      /* the gain the music sinks aim for now: 1 while idle, else the duck (resample.h music_duck_gain) */
 int  core_stop_ends_listening(int set);          /* "<wake word>, stop" also ends listening (main.c stop_word), -1 reads */
 int  core_bt_announce(int set);                  /* same: chime and "Connected to <name>" when a phone connects */
 int  core_bluetooth(int set);                   /* same; -B on the command line: leave the radio to the stock stack */

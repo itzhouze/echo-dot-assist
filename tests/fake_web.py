@@ -102,7 +102,7 @@ async def main():
         ha, by, states = await ha_connect()
         page_only = {"mic_level", "noise_reduction", "sound_detection", "debug_access_adb", "join_arbitration_network", "online_updates",
                      "bluetooth_announcements", "bluetooth_announcement_language", "soc_temperature", "cpu_usage", "wifi_motion_detection",
-                     "speaker_gain"}
+                     "speaker_gain", "music_duck"}
         check(not page_only & set(by) and {"wake_sound", "mute", "do_not_disturb", "firmware", "equalizer_bass", "led_brightness"} <= set(by),
               f"Home Assistant lists the lean set only: {sorted(set(by))}")
         check("sound" in by and "last_request_whispered" in by and "arbitration_peers" in by and "arbitration_key" in by,
@@ -172,6 +172,20 @@ async def main():
         check(r["applied"] == 0 and ctl() == "12", f"+13 dB: out of range, refused: {r['errors']!r}")
         b.set(speaker_gain=0); await until(lambda: ctl() == "6")
         check(ctl() == "6" and cfg().get("speaker_gain") == "0", "+0 dB: stock again")
+
+        # music_duck (main.c core_music_duck): how far the music gives way to the assistant; the sinks read it (resample.c)
+        d = next((x for x in b.state()["settings"] if x["name"] == "music_duck"), {})
+        check(d.get("group") == "Sound" and d.get("value") == 16 and (d.get("min"), d.get("max")) == (0, 40) and d.get("export")
+              and not d.get("feature"), f"music duck on the page: -16 dB by default (the old sixth), 0..40, exported, page only: {d}")
+        r = b.set(music_duck=30)
+        check(r.get("applied") == 1 and cfg().get("music_duck") == "30", f"-30 dB: saved: {r}")
+        r = b.set(music_duck=40)
+        check(r.get("applied") == 1 and cfg().get("music_duck") == "40", "40: the top, silent, saved")
+        r = b.set(music_duck=41)
+        check(r["applied"] == 0 and cfg().get("music_duck") == "40", f"41: out of range, refused: {r['errors']!r}")
+        r = b.set(music_duck=0)
+        check(r.get("applied") == 1 and cfg().get("music_duck") == "0", "0: the music left alone, saved")
+        b.set(music_duck=16)
 
         # signatures
         body = b"wake_sound=on\n"; hd = b.headers("POST", "/api/set", body)

@@ -250,6 +250,10 @@ select { font: inherit; font-size: 14px; color: var(--fg); background: var(--sur
 .slider { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 420px; }
 .slider output { min-width: 76px; font-variant-numeric: tabular-nums; font-weight: 560; font-size: 14px; }
 .slider .ends { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.slider.with-ends { flex-wrap: wrap; gap: 0 12px; }
+.slider.with-ends input[type=range] { order: 1; flex: 1 1 60%; }
+.slider.with-ends output { order: 0; flex: 1 1 100%; min-width: 0; margin-bottom: 2px; }
+.slider.with-ends .ends { order: 2; flex: 1 1 100%; display: flex; justify-content: space-between; gap: 12px; }
 input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 26px; background: none; margin: 0; min-width: 0; }
 input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px;
   background: linear-gradient(to right, var(--accent) var(--p, 50%), var(--line-2) var(--p, 50%)); }

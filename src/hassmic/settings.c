@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "resample.h"
 #include "board.h"
 #include "core.h"
 #include "a2dp.h"
@@ -71,7 +72,7 @@ static void path(char *out, size_t cap, const char *file) { snprintf(out, cap, "
 /* ---------------------------------------------------------------- the table */
 
 enum id { WAKE_ENGINE, SPEECH_LANG, WAKE_ADAPT, MIC_LEVEL, DENOISE, WAKE_SOUND, SOUND_TOUCH, SOUND_MICS_OFF, SOUND_MICS_ON, SOUND_VOLUME, SOUND_BT_ON, SOUND_BT_OFF, WAKE_SOUND_REMOVAL, MUTE, DND, TIMER_RING, TIMER_SOUND, TIMER_STOP_ANY, STOP_ENDS, WAKE_IN_REQ, END_REQ, BT_ANNOUNCE, BT_LANG, LED_AUTO, LED_LEVEL, RING_ROT, BAND, SCR_AUTO, SCR_LEVEL, SCR_ADJUST, ARB, ARB_MODE, ARB_AUTO, ARB_WINDOW, ARB_OFFSET, SOUND, WHISPER, WAKE_EVENTS, REQUEST_TEXT, WIFI_MOTION,
-          WIFI_SENS, LIGHT_SENSOR, BT_AUDIO, BT_SPEAKER, BT_OUT_DELAY, BT_OUT_AWAKE, BT_OUT_STAY, DROPIN, DROPIN_ANSWER, UPDATES, HTTPS_VERIFY, KIOSK_NET, KIOSK_MIC, KIOSK_CAM, SS_UNPAIRED, EQ_BASS, EQ_MID, EQ_TREBLE, SPK_GAIN, VOLUME, VOL_SPLIT,
+          WIFI_SENS, LIGHT_SENSOR, BT_AUDIO, BT_SPEAKER, BT_OUT_DELAY, BT_OUT_AWAKE, BT_OUT_STAY, DROPIN, DROPIN_ANSWER, UPDATES, HTTPS_VERIFY, KIOSK_NET, KIOSK_MIC, KIOSK_CAM, SS_UNPAIRED, EQ_BASS, EQ_MID, EQ_TREBLE, SPK_GAIN, MUSIC_DUCK, VOLUME, VOL_SPLIT,
           ASSIST_LINK, ASSIST_LEVEL, ASSIST_OFFSET, SOUNDS_LINK, SOUNDS_LEVEL, SOUNDS_OFFSET, TIMER_LINK, TIMER_LEVEL, TIMER_OFFSET,
           CALL_LINK, CALL_LEVEL, CALL_OFFSET,
           VOL_EVEN, NSET };
@@ -168,6 +169,9 @@ static const struct setting table[NSET] = {
     [EQ_TREBLE]   = { "equalizer_treble", "Equalizer treble", "Sound", "dB", S_INT, -6, 6, 1, 0 },
     /* over stock (spkgain.c); not exported: speakers of one model differ (one Dot 2 is clean where another is too loud) */
     [SPK_GAIN]    = { "speaker_gain", "Speaker gain", "Sound", "dB", S_INT, 0, SPKGAIN_MAX, 0, 0 },  /* settings_max() */
+    /* main.c core_music_duck: how far Sendspin and Bluetooth music is turned down while a request runs.  Exported: how a
+     * household wants its music to give way to the assistant (the room and its loudness vary, but one home's Echos agree) */
+    [MUSIC_DUCK]  = { "music_duck", "Music while the assistant is active", "Sound", "dB", S_INT, 0, MUSIC_DUCK_MAX_DB, 1, 0 },
     /* the page draws these as one card of its own (web/app.js buildVolumes).  The volume itself (music's, with separate
      * volumes) is the mixer's or main.c's, not state/config's, and no export's: a volume is for the room it is in */
     [VOLUME]      = { "volume", "Volume", "Sound", "%", S_INT, 0, 100, 0, 0 },
@@ -314,6 +318,7 @@ int settings_get(const struct setting *s)
     case DROPIN: return dropin_enable(-1);
     case DROPIN_ANSWER: return dropin_ask(-1);
     case SPK_GAIN: return spkgain_get();
+    case MUSIC_DUCK: return core_music_duck(-1);
     case VOLUME: return core_volume();
     case VOL_SPLIT: return core_separate_volumes(-1);
     case VOL_EVEN: return core_even_volume(-1);
@@ -382,6 +387,7 @@ static void put(enum id i, int v)
     case DROPIN: dropin_enable(v); break;
     case DROPIN_ANSWER: dropin_ask(v); break;
     case SPK_GAIN: spkgain_set(v); break;
+    case MUSIC_DUCK: core_music_duck(v); break;
     case VOLUME: core_set_volume(v); break;
     case VOL_SPLIT: core_separate_volumes(v); break;
     case VOL_EVEN: core_even_volume(v); break;

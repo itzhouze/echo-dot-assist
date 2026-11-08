@@ -71,6 +71,7 @@
 #include "sound.h"
 #include "whisper.h"
 #include "settings.h"
+#include "resample.h"
 #include "web.h"
 #include "board.h"
 #include "clock.h"
@@ -849,6 +850,19 @@ int core_sound_on(int s, int set)
 int core_wake_in_request(int set) { if (set >= 0) wake_in_request = set != 0; return wake_in_request; }
 int core_end_of_request(int set) { if (set >= 0 && set < MICEND_MODES) end_mode = set; return end_mode; }
 int core_stop_ends_listening(int set) { if (set >= 0) stop_ends = set != 0; return stop_ends; }
+
+/* Setting music_duck: how far the music is turned down while a request runs (listening, thinking, speaking), in dB;
+ * 0 leaves it alone, MUSIC_DUCK_MAX_DB is silence.  Read by the music sinks (sendspin.c, a2dp.c) on their own threads,
+ * so atomic.  The duck starts when the Echo has decided it answers, not at the wake word: with several Echos in an
+ * arbitration round (up to the window, arb.c) the Echos that lose keep playing, and the music of the whole house would
+ * dip for every "Alexa" */
+static atomic_int music_duck_db = MUSIC_DUCK_DEFAULT_DB;
+int core_music_duck(int set)
+{
+    if (set >= 0) atomic_store(&music_duck_db, set > MUSIC_DUCK_MAX_DB ? MUSIC_DUCK_MAX_DB : set);
+    return atomic_load(&music_duck_db);
+}
+float core_duck_gain(void) { return core_state() != IDLE ? music_duck_gain(atomic_load(&music_duck_db)) : 1; }
 
 int core_bt_announce(int set) { if (set >= 0) use_bt_announce = set; return use_bt_announce; }
 
