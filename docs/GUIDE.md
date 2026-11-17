@@ -803,6 +803,7 @@ Echo announces itself again after 100 s without Home Assistant, then less and le
 | [Sound detection](#sound-detection) | Sound (event) |
 | [Whisper detection](#whisper-detection) | Last request whispered |
 | Wake word events (off by default) | Wake word (event): `detected` (the Echo took it), `near_miss` (Amazon's engine heard something close, did not wake; none with microWakeWord), `answered_elsewhere` (another Echo or satellite answered), `no_speech` (woke, nothing said). A `detected` followed by `no_speech` is a false wake. Nothing while muted. Near misses can come often while the TV plays: an entry in Home Assistant's history each |
+| [Clap detection](#claps) (experimental, off by default) | Clap (event): `double_clap`, `triple_clap` |
 | Request and reply text (off by default) | Last heard (what speech-to-text understood), Last reply (what the assistant answered). Both are cleared when a request starts, so the same request twice is still a change. Home Assistant takes at most 255 characters per state: a longer reply ends in "…". Every request and reply goes into Home Assistant's history while this is on. ESPHome only |
 | [Wi-Fi motion](#wi-fi-motion) | motion sensor, sensitivity |
 | Light sensor (off by default) | Illuminance (the room's light in lux); "LED brightness" then also follows auto brightness, an entry in the logbook every few minutes. Off, it shows only levels you set |
@@ -922,6 +923,28 @@ Replace `[whisper]` with the markup your text to speech understands; Piper has n
   hears, from the wake word's end on.
 - Sounds without words (breathing, rustling) can score high, but only what the pipeline took for a command is scored.
 - On the Echo, during your request only. ESPHome only. Background: [re-whisper.md](re-whisper.md).
+
+## Claps
+
+Home Assistant gets an event when someone claps
+twice (`double_clap`) or three times (`triple_clap`) in a row, 0.15 to 0.7 s apart and about as loud each time. One
+clap, four and more (applause), claps over talk or music, and a door's bang count for nothing. The Echo listens for
+them only while it is idle and plays nothing (no reply, music, timer, Drop In, nor its own sounds) and never while it
+is muted. Nothing of the sound leaves the Echo, only the event. It hears what Amazon's echo canceller and beamformer
+pass on, not the microphones themselves: tell us on the forum, with the Echo's log, if your claps are missed or come
+by mistake. A light switch without a switch:
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.kitchen_echo_clap
+    attribute: event_type
+    to: double_clap
+actions:
+  - action: light.toggle
+    target:
+      entity_id: light.kitchen
+```
 
 ## Wi-Fi motion
 

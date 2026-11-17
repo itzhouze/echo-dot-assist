@@ -103,7 +103,7 @@ static int colour_actual(void)
 
 /* ---------------------------------------------------------------- the table */
 
-enum id { WAKE_ENGINE, SPEECH_LANG, WAKE_ADAPT, MIC_LEVEL, DENOISE, WAKE_SOUND, SOUND_TOUCH, SOUND_MICS_OFF, SOUND_MICS_ON, SOUND_VOLUME, SOUND_BT_ON, SOUND_BT_OFF, WAKE_SOUND_REMOVAL, MUTE, DND, TIMER_RING, TIMER_SOUND, TIMER_STOP_ANY, TIMER_STOP_OTHERS, STOP_ENDS, MULTI_PRESS, WAKE_IN_REQ, END_REQ, BT_ANNOUNCE, BT_LANG, LED_AUTO, LED_LEVEL, RING_ROT, BAND, MUSIC_PAGE, SCR_AUTO, SCR_LEVEL, SCR_ADJUST, SCR_COLOUR, SCREEN_TEXT, SCREEN_HOLD, SCREEN_TIMERS, SCR_SLEEP, SCR_CLOCK, ARB, ARB_MODE, ARB_AUTO, ARB_WINDOW, ARB_OFFSET, SOUND, WHISPER, WAKE_EVENTS, REQUEST_TEXT, RING_LIVE, WIFI_MOTION,
+enum id { WAKE_ENGINE, SPEECH_LANG, WAKE_ADAPT, MIC_LEVEL, DENOISE, WAKE_SOUND, SOUND_TOUCH, SOUND_MICS_OFF, SOUND_MICS_ON, SOUND_VOLUME, SOUND_BT_ON, SOUND_BT_OFF, WAKE_SOUND_REMOVAL, MUTE, DND, TIMER_RING, TIMER_SOUND, TIMER_STOP_ANY, TIMER_STOP_OTHERS, STOP_ENDS, MULTI_PRESS, WAKE_IN_REQ, END_REQ, BT_ANNOUNCE, BT_LANG, LED_AUTO, LED_LEVEL, RING_ROT, BAND, MUSIC_PAGE, SCR_AUTO, SCR_LEVEL, SCR_ADJUST, SCR_COLOUR, SCREEN_TEXT, SCREEN_HOLD, SCREEN_TIMERS, SCR_SLEEP, SCR_CLOCK, ARB, ARB_MODE, ARB_AUTO, ARB_WINDOW, ARB_OFFSET, SOUND, WHISPER, WAKE_EVENTS, CLAP, REQUEST_TEXT, RING_LIVE, WIFI_MOTION,
           WIFI_SENS, LIGHT_SENSOR, BT_PROXY, BT_AUDIO, BT_SPEAKER, BT_OUT_DELAY, BT_OUT_AWAKE, BT_OUT_STAY, DROPIN, DROPIN_ANSWER, UPDATES, HTTPS_VERIFY, KIOSK_NET, KIOSK_MIC, KIOSK_CAM, KIOSK_DLNA, SS_UNPAIRED, EQ_BASS, EQ_MID, EQ_TREBLE, SPK_GAIN, DUCK, DUCK_OTHERS, VOLUME, VOL_SPLIT,
           ASSIST_LINK, ASSIST_LEVEL, ASSIST_OFFSET, SOUNDS_LINK, SOUNDS_LEVEL, SOUNDS_OFFSET, TIMER_LINK, TIMER_LEVEL, TIMER_OFFSET,
           CALL_LINK, CALL_LEVEL, CALL_OFFSET,
@@ -189,6 +189,8 @@ static const struct setting table[NSET] = {
     [WHISPER]     = { "whisper_detection", "Whisper detection", "Features", NULL, S_BOOL, 0, 1, 1, 1 },
     /* proto_esphome.c's "Wake word" event entity (core_wake_events, issue #48) */
     [WAKE_EVENTS] = { "wake_events", "Wake word events", "Features", NULL, S_BOOL, 0, 1, 1, 1 },
+    /* proto_esphome.c's "Clap" event entity (clap.h); main.c keeps it, the capture thread reads it */
+    [CLAP]        = { "clap_detection", "Clap detection", "Features", NULL, S_BOOL, 0, 1, 1, 1 },
     /* proto_esphome.c's "Last heard" and "Last reply" text sensors (issue #53) */
     [REQUEST_TEXT] = { "request_text", "Request and reply text", "Features", NULL, S_BOOL, 0, 1, 1, 1 },
     /* ringlive.c: the ring's LEDs from Home Assistant, written by hassmic itself (12 lights, frames, animations, designs) */
@@ -402,6 +404,7 @@ int settings_get(const struct setting *s)
     case WHISPER: return whisper;
     case LIGHT_SENSOR: return light_sensor;
     case WAKE_EVENTS: return wake_events;
+    case CLAP: return core_clap(-1);
     case REQUEST_TEXT: return request_text;
     case RING_LIVE: return ring_live;
     case DROPIN: return dropin_enable(-1);
@@ -481,6 +484,7 @@ static void put(enum id i, int v)
     case WHISPER: whisper = v; core_whisper_enable(v); break;
     case LIGHT_SENSOR: light_sensor = v; break;
     case WAKE_EVENTS: wake_events = v; break;
+    case CLAP: core_clap(v); break;
     case REQUEST_TEXT: request_text = v; break;
     case RING_LIVE: ring_live = v; ringlive_enable(v); break;    /* off: the ring back to ledcontroller, the palette's light */
     case BT_OUT_DELAY: a2dp_out_delay(v); break;                    /* a2dp.c saves it */

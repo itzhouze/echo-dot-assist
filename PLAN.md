@@ -4313,3 +4313,17 @@ word and echo cancellation in a room, all checked on our unit (2026-11-15).
       builder made then had no VERSION, libhmled.so, hassmic_rcpi4m.ko or latency (an update's files): on it the light
       ring has no Home Assistant light, no Wi-Fi motion, and the logs say "factory".  The builder's `--port` takes a
       bundle's files whole now, VERSION and update.pub included; this unit keeps the old copy until a reflash.
+- [ ] Claps as a Home Assistant event (2026-11-14; `clap.c`, setting `clap_detection`, feature, off): TECHO5's double
+      clap detector (echod/internal/feature/clap/detect.go, MIT) on micAsr in 10 ms blocks: onset >= 18 dB over the
+      floor from under 6 dB and bright (rms of the first difference >= 0.5 x rms), down 15 dB within 120 ms; claps
+      150-700 ms apart, peaks within 6 dB, lengths within 4 blocks; quiet after (nothing rising 12 dB over the floor and
+      above the first clap's end level).  Rows of 2 and 3 are told (`double_clap`, `triple_clap`), told 700 ms after the
+      last clap's start.  One change: the floor is the quietest block of the last 2 s (four windows of 0.5 s), not
+      TECHO5's 0.3 dB down / 0.002 dB up a block, which kept a floor taken from a stream's digital silence at -90 dBFS
+      for half an hour.  Left out (main.c `clap_listen`): any state but IDLE, streaming, music, TTS, timers ringing,
+      our sounds and 250 ms of their tail, 500 ms after anything of ours started or stopped, Drop In; muted: not told.
+      PC: `tests/unit/clap_test.c` (17 synthetic cases: rows, timing, a voice, a door, talk after and under, own
+      playback, a loud room, digital silence first), `tests/fake_ha_clap.py` (a looped capture of two and three claps,
+      none while a request runs).  **Open, on an Echo:** whether claps survive Amazon's front end as the thresholds
+      assume (its gain stage after the beamformer may flatten the peak): `kill -TTIN` dump with claps from across the
+      room, talk, dishes, a door, the TV; then the thresholds against it (`build/clap_test` takes no file yet).

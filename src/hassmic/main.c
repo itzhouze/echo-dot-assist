@@ -59,6 +59,7 @@
 #include "micdenoise.h"
 #include "earsup.h"
 #include "afemeta.h"
+#include "clap.h"
 #include "micend.h"
 #include "micgain.h"
 #include "wordtail.h"
@@ -789,6 +790,18 @@ const int core_wake_nevents = sizeof core_wake_events / sizeof core_wake_events[
 static void wake_told(const char *event)       /* lock held */
 {
     if (connected && proto->wake && !core_muted()) proto->wake(event);
+}
+
+/* Claps (clap.h, setting clap_detection, off by default): "Clap" in Home Assistant, two or three in a row, heard only
+ * while the Echo is idle and quiet: nothing of its own playing or still in the mic (as sound detection's on_sound
+ * leaves out), no request, no Drop In.  Types stay as they are: automations use them */
+const char *const core_clap_events[] = { "double_clap", "triple_clap" };
+const int core_clap_nevents = sizeof core_clap_events / sizeof core_clap_events[0];
+static atomic_int clap_on;
+int core_clap(int set)
+{
+    if (set >= 0 && set != atomic_exchange(&clap_on, set != 0)) fprintf(stderr, "clap detection: switched %s\n", set ? "on" : "off");
+    return atomic_load(&clap_on);
 }
 
 static void wake_tell(const char *event)       /* any thread but the lock's holder */
@@ -3476,6 +3489,28 @@ static void wake_load(void)
     pthread_mutex_lock(&core_lock); wake_loaded_set(); pthread_mutex_unlock(&core_lock);
 }
 
+static void clap_listen(const int16_t *pcm, size_t count)      /* capture thread */
+{
+    static struct clap c; static int running;
+    if (!atomic_load(&clap_on)) { running = 0; return; }
+    if (!running) { clap_init(&c); running = 1; }
+    long long now = mono_ms();
+    int own = atomic_load(&busy) || atomic_load(&streaming) || atomic_load(&alarm_on) || atomic_load(&music_on) || atomic_load(&tts_on)
+              || atomic_load(&earcon_sounding) || atomic_load(&sounds_pending) || now - atomic_load(&own_sound_ms) < 500
+              || now < atomic_load(&earcon_heard_until) || atomic_load(&dropin_live);
+    const char *why = NULL;
+    int row = clap_feed(&c, pcm, count, own, &why);
+    if (why) fprintf(stderr, "%s\n", why);
+    if (row < 2 || row - 2 >= core_clap_nevents) return;
+    pthread_mutex_lock(&core_lock);
+    if (core_muted()) fprintf(stderr, "clap: %d in a row, muted: not told\n", row);
+    else {
+        fprintf(stderr, "clap: %d in a row\n", row);
+        if (connected && proto->clap) proto->clap(core_clap_events[row - 2]);
+    }
+    pthread_mutex_unlock(&core_lock);
+}
+
 static void *capture_thread(void *arg)
 {
     FILE *dump = NULL;
@@ -3574,6 +3609,7 @@ static void *capture_thread(void *arg)
             } else replay_from = 0;
             pthread_mutex_unlock(&core_lock);
         }
+        clap_listen(pcm, n / 2);
         if (atomic_load(&whisper_last) != -2) {     /* a model: what streams to the pipeline is one request */
             int s = atomic_load(&streaming);
             /* a run over: its detector ends.  Also when the next run already started: core_pipeline_finish restarts one

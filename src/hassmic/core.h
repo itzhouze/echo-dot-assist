@@ -52,6 +52,7 @@ struct proto {
                                                  * the server goes on with what it has (stop() aborts the run) */
     void (*reply_cut)(void);                    /* may be NULL: the reply playing is cut (flush) while the run goes on: stop
                                                  * fetching it now, not at the server's next chunk */
+    void (*clap)(const char *event);            /* may be NULL: claps heard (core_clap_events) */
 };
 extern const struct proto proto_wyoming, proto_esphome;
 
@@ -170,6 +171,11 @@ extern const int core_button_nevents;
  * another Echo, nothing said after it */
 extern const char *const core_wake_events[];
 extern const int core_wake_nevents;
+/* Claps (clap.h), setting clap_detection: the event types of Home Assistant's "Clap" entity, by how many came in a row
+ * (core_clap_events[n - 2]).  core_clap: 0/1, -1 reads; no lock needed */
+extern const char *const core_clap_events[];
+extern const int core_clap_nevents;
+int  core_clap(int set);
 
 /* no lock needed */
 /* lock held for this one: switches to SPEAKING.  media: Home Assistant's media, which plays at the main volume (not a

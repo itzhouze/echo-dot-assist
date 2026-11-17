@@ -17,6 +17,8 @@
  *                    they do on the Echo (core_button_events)
  *   wake word        the event entity "Wake word" (core_wake_events): taken, near miss, answered by another device,
  *                    nothing said after it.  Listed while the feature is on
+ *   claps            the event entity "Clap" (core_clap_events, clap.h): two or three in a row.  Listed while the
+ *                    feature is on
  *   light ring       a light with RGB, brightness and effects, steps aside while the Echo shows something of its own
  *                    (ring.h); listed where root installed the ring's animations
  *   timers           finished timers ring (core_timer_finished); "Timer ringing" and "Ringing timers" (their names)
@@ -157,7 +159,8 @@ enum { KEY_NOISE = 2, KEY_MIC_LEVEL, KEY_MULT, KEY_MUTE, KEY_WAKE_SOUND, KEY_SEN
        KEY_NEXT_TIMER, KEY_NEXT_TIMER_NAME, KEY_NEXT_TIMER_LENGTH, KEY_SCR_AUTO, KEY_SCR_LEVEL, KEY_SCR_ADJUST,
        /* the light ring live (ringlive.h): four actions, the design select, then a light per LED (RING_LEDS_MAX keys:
         * a new key goes after KEY_LIVE_LED + RING_LEDS_MAX) */
-       KEY_LIVE_FRAME, KEY_LIVE_ANIM, KEY_LIVE_DESIGN_SVC, KEY_LIVE_STOP, KEY_LIVE_DESIGN, KEY_LIVE_LED };
+       KEY_LIVE_FRAME, KEY_LIVE_ANIM, KEY_LIVE_DESIGN_SVC, KEY_LIVE_STOP, KEY_LIVE_DESIGN, KEY_LIVE_LED,
+       KEY_CLAP = KEY_LIVE_LED + RING_LEDS_MAX };
 enum { MP_KEY = 1, MP_IDLE = 1, MP_PLAYING = 2, MP_CMD_STOP = 2, MP_CMD_MUTE = 3, MP_CMD_UNMUTE = 4 };
 #define MEDIA_RATE 48000        /* what we ask Home Assistant to transcode announcements and media to: WAV mono s16 */
 
@@ -661,6 +664,7 @@ static int listed(int key)
     case KEY_SENDSPIN_TOKEN: return core_sendspin_port != 0;
     case KEY_SOUND: return settings_on("sound_detection");
     case KEY_WAKE: return settings_on("wake_events");
+    case KEY_CLAP: return settings_on("clap_detection");
     case KEY_LAST_HEARD: case KEY_LAST_REPLY: return settings_on("request_text");
     case KEY_BT_PAIRING: return ble_present() && settings_on("bluetooth_audio");
     case KEY_BT_OUT_SEARCH: case KEY_BT_OUT: case KEY_BT_OUT_STATUS: case KEY_BT_OUT_DELAY: return ble_present() && settings_on("bluetooth_speaker");
@@ -716,6 +720,11 @@ static void send_setting_entities(void)
       send_msg(LIST_EVENT, &b); }
     if (listed(KEY_WAKE)) { PB(b, 192); pb_str(&b, 1, "wake_word"); pb_fixed32(&b, 2, KEY_WAKE); pb_str(&b, 3, "Wake word"); pb_str(&b, 5, "mdi:account-voice");
       for (int i = 0; i < core_wake_nevents; i++) pb_str(&b, 9, core_wake_events[i]);
+      send_msg(LIST_EVENT, &b); }
+    /* Claps (clap.h): two or three in a row, while the Echo is idle and plays nothing.  Types stay as they are */
+    if (listed(KEY_CLAP)) { PB(b, 192); pb_str(&b, 1, "clap"); pb_fixed32(&b, 2, KEY_CLAP); pb_str(&b, 3, "Clap");
+      pb_str(&b, 5, "mdi:hand-clap");
+      for (int i = 0; i < core_clap_nevents; i++) pb_str(&b, 9, core_clap_events[i]);
       send_msg(LIST_EVENT, &b); }
     if (listed(KEY_BT_PAIRING)) { PB(b, 128); pb_str(&b, 1, "bluetooth_pairing"); pb_fixed32(&b, 2, KEY_BT_PAIRING); pb_str(&b, 3, "Bluetooth pairing");
       pb_str(&b, 5, "mdi:bluetooth-connect"); send_msg(LIST_SWITCH, &b); }
@@ -2116,6 +2125,12 @@ static void wake_event(const char *event)       /* lock held */
     if (listed(KEY_WAKE)) { send_state(EVENT, &b); fprintf(stderr, "wake event: %s\n", event); }
 }
 
+static void clap(const char *event)     /* lock held */
+{
+    PB(b, 64); pb_fixed32(&b, 1, KEY_CLAP); pb_str(&b, 2, event);
+    if (listed(KEY_CLAP)) { send_state(EVENT, &b); fprintf(stderr, "clap event: %s\n", event); }
+}
+
 static void whispered(int on) { (void)on; send_setting(KEY_WHISPERED); }   /* lock held */
 static void timers_changed(void)        /* lock held: names first, the next timer's end last */
 {
@@ -2141,4 +2156,4 @@ static void dropin_result(const char *result)   /* lock held */
 
 const struct proto proto_esphome = { "esphome", 26053, 1, serve, start, audio, stop, cancel, played, volume_changed, mute_changed, print_mdns, bt_device,
                                      arb_send, arb_changed, sound, whispered, arb_request, settings_changed, entities_changed, arb_scan,
-                                     timers_changed, dropin_changed, dropin_result, button, wake_event, end_audio, reply_cut };
+                                     timers_changed, dropin_changed, dropin_result, button, wake_event, end_audio, reply_cut, clap };

@@ -2,6 +2,15 @@
 
 What changed for people using the Echo, newest first. Details and measurements are in [PLAN.md](PLAN.md).
 
+## 2026-11-17 — Clapping as a switch (experimental)
+
+- **Clapping as a switch (experimental).** With "Clap detection" on (settings page, Features; off by default), Home
+  Assistant gets a "Clap" event when someone claps twice or three times in a row: `double_clap` or `triple_clap`, for
+  an automation that toggles a light. One clap, applause, claps over talk or music and a banging door count for
+  nothing. The Echo listens for claps only while it is idle and plays nothing, never while muted, and only the event
+  leaves it. It hears the sound after Amazon's echo canceller, not the bare microphones: whether every room's claps
+  come through is still to be seen, so tell us if they are missed or come by mistake.
+
 ## 2026-11-17 — Fire smooth again on an Echo running for weeks
 
 - **Light ring live: the "Fire" effect no longer stutters on an Echo that has been running for a week or more (Echo

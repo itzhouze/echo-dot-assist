@@ -392,6 +392,8 @@ const HELP = {
         : 'Model: the one in the Echo\'s firmware. Download from Amazon (Models page) gets Amazon\'s newer one (retrained, same sounds).');
     } },
   wake_events: { icon: 'ear', ha: ['Wake word (event)'], help: 'Home Assistant gets a "Wake word" event each time this Echo hears its wake word. Its type says what came of it: detected (it took it), near_miss (almost: Amazon\'s engine heard something close but did not wake), answered_elsewhere (another Echo or satellite answered it) and no_speech (it woke, then nothing was said). Count them per room in an automation; a detected followed by no_speech is a false wake. Near misses can come often while the TV or music plays, each an entry in Home Assistant\'s history. microWakeWord has no near misses.' },
+  clap_detection: { icon: 'wave', tag: 'Experimental', ha: ['Clap (event)'], help: 'Home Assistant gets a "Clap" event when someone claps twice (double_clap) or three times (triple_clap) in a row: a light switch without a switch. One clap, applause, claps over talk or music and a door banging count for nothing. It listens only while the Echo is idle and plays nothing, and never while it is muted. Nothing of the sound leaves the Echo, only the event.',
+    note: 'Amazon\'s echo canceller and beamformer sit between the microphones and this: if claps are missed or come by mistake in your room, say so on the forum with the Echo\'s log.' },
   request_text: { icon: 'whisper', ha: ['Last heard', 'Last reply'], help: 'Two text sensors in Home Assistant: what speech-to-text understood of your last request, and what the assistant answered. For a dashboard beside the Echo, or an automation on a word it keeps mishearing. Both are cleared when a new request starts, so saying the same thing twice still counts as a change. Home Assistant takes at most 255 characters per state: a longer reply ends in "…".',
     note: 'Home Assistant keeps every request and reply in its history while this is on.' },
   whisper_detection: { icon: 'whisper', ha: ['Last request whispered'], help: 'Tells whether your last request was whispered, before speech-to-text finishes. Use it in your conversation agent\'s prompt to have it answer quietly.' },
@@ -476,6 +478,7 @@ const SUB = {
   arbitration_window: 'How long the Echo waits for other devices',
   sound_detection: 'Events for smoke alarms, breaking glass, barking and more',
   wake_events: 'An event each time this Echo hears its wake word',
+  clap_detection: 'An event when someone claps twice or three times',
   request_text: 'What was heard and answered, as two text sensors',
   whisper_detection: 'Tells Home Assistant when a request was whispered',
   wifi_motion: 'A motion sensor from changes in the Wi-Fi signal',
