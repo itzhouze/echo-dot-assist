@@ -4320,10 +4320,11 @@ word and echo cancellation in a room, all checked on our unit (2026-11-15).
       above the first clap's end level).  Rows of 2 and 3 are told (`double_clap`, `triple_clap`), told 700 ms after the
       last clap's start.  One change: the floor is the quietest block of the last 2 s (four windows of 0.5 s), not
       TECHO5's 0.3 dB down / 0.002 dB up a block, which kept a floor taken from a stream's digital silence at -90 dBFS
-      for half an hour.  Left out (main.c `clap_listen`): any state but IDLE, streaming, music, TTS, timers ringing,
-      our sounds and 250 ms of their tail, 500 ms after anything of ours started or stopped, Drop In; muted: not told.
-      PC: `tests/unit/clap_test.c` (17 synthetic cases: rows, timing, a voice, a door, talk after and under, own
-      playback, a loud room, digital silence first), `tests/fake_ha_clap.py` (a looped capture of two and three claps,
-      none while a request runs).  **Open, on an Echo:** whether claps survive Amazon's front end as the thresholds
+      for half an hour; and never under -75 dBFS (`CLAP_FLOOR_MIN_DB`), or digital silence made the microphone's own noise a "clap".
+      Counters are 64-bit (a 32-bit block count wraps after 248 days of uptime).  Left out (main.c `clap_listen`): any state but IDLE, streaming, music, TTS, timers ringing,
+      our sounds and 250 ms of their tail, 500 ms after anything of ours started or stopped, Drop In; muted: not looked for at all (`clap_blind`).
+      PC: `tests/unit/clap_test.c` (22 synthetic cases: rows, timing, a voice, a door, talk after and under, own
+      playback, a loud room, digital silence first and its noise after, 350 days of blocks, the log's words),
+      `tests/fake_ha_clap.py` (a looped capture of two and three claps, none while a request runs or while muted).  **Open, on an Echo:** whether claps survive Amazon's front end as the thresholds
       assume (its gain stage after the beamformer may flatten the peak): `kill -TTIN` dump with claps from across the
       room, talk, dishes, a door, the TV; then the thresholds against it (`build/clap_test` takes no file yet).

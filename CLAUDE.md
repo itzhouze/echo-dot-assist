@@ -312,7 +312,7 @@ No model `#ifdef`s in shared code: new differences become a board field, a `devi
 - **Claps (`clap.c`, `clap.h`)**: setting `clap_detection` (feature, experimental, off): TECHO5's double clap rules
   on micAsr in 10 ms blocks (the floor the quietest block of 2 s instead of its slow rise), rows of 2/3 = the "Clap"
   event entity (`double_clap`, `triple_clap`, `core_clap_events`); fed by the capture thread (`main.c` `clap_listen`)
-  only while IDLE and nothing of ours plays or is still in the mic (on_sound's flags), never muted.
+  only while IDLE and nothing of ours plays or is still in the mic (`clap_blind`: on_sound's flags), never muted.
   `tests/unit/clap_test.c`, `tests/fake_ha_clap.py`.  Not yet checked against claps on an Echo (PLAN.md).
 - **Whisper detection (`whisper.h`)**: `whisper_pryon.c` (libpryon `WhisperApi_*`, one detector per request fed from the
   ring at the request's start as HA gets it (`main.c` `whisper_from`: the wake word's tail end; live with `-w remote`),

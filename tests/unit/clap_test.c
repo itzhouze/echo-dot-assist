@@ -3,6 +3,7 @@
  * thump as a 60 Hz burst.  Every case is fed in uneven pieces, as the capture thread's reads are, and must give the
  * same as fed whole. */
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +14,7 @@
 static int16_t pcm[MAXS];
 static unsigned char own[MAXS];
 static int len, bad;
+static int64_t start_block;                         /* where the detector's block count starts: an Echo that ran for months */
 static unsigned rnd = 1;
 
 static double noise(void) { rnd = rnd * 1103515245u + 12345u; return ((rnd >> 8) & 0xffff) / 32768.0 - 1.0; }
@@ -54,7 +56,7 @@ static void own_from(int from_ms, int to_ms) { for (int i = from_ms * RATE / 100
 static int run(int pieces, int *rows)               /* the rows told, in order; how many */
 {
     struct clap c; int n = 0, i = 0;
-    clap_init(&c);
+    clap_init(&c); c.block = start_block;
     while (i < len) {
         int k = pieces ? 1 + (int)((noise() + 1) * 400) : 320;     /* 1..800 samples, own flag constant within */
         if (i + k > len) k = len - i;
@@ -116,6 +118,19 @@ int main(void)
     room(11000, -60); clap(1000, -20); clap(1300, -20); clap(5000, -20); clap(5300, -20);
     { int a[8]; int n = run(0, a); int ok = n == 2 && a[0] == 2 && a[1] == 2;
       printf("%s two double claps 4 s apart: %d rows\n", ok ? "ok  " : "FAIL", n); if (!ok) bad = 1; }
+    room(3000, -140); clap(1000, -70); clap(1300, -70);
+    check("digital silence, then the microphone's own noise as two bursts (-70 dBFS)", 0);
+    room(3000, -60); clap(1000, -20); clap(1300, -20); start_block = (int64_t)1 << 31;
+    check("two claps after 248 days of blocks (a 32-bit count wrapped)", 2);
+    start_block = INT64_C(3000000000);
+    check("two claps after 350 days", 2);
+    start_block = 0;
+    { room(4000, -60); clap(1000, -20); struct clap c; const char *why = NULL; clap_init(&c);
+      clap_feed(&c, pcm, (size_t)len, 0, &why);
+      int ok = !why; printf("%s one clap alone leaves nothing in the log\n", ok ? "ok  " : "FAIL"); if (!ok) bad = 1; }
+    { room(4000, -60); clap(1000, -20); clap(1300, -20); vowel(1500, 600, -25); struct clap c; const char *why = NULL; clap_init(&c);
+      clap_feed(&c, pcm, (size_t)len, 0, &why);
+      int ok = why && !strcmp(why, "clap: a loud dull sound"); printf("%s a row dropped says why: %s\n", ok ? "ok  " : "FAIL", why ? why : "(nothing)"); if (!ok) bad = 1; }
     printf(bad ? "clap: FAILED\n" : "clap: all ok\n");
     return bad;
 }

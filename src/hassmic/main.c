@@ -798,6 +798,7 @@ static void wake_told(const char *event)       /* lock held */
 const char *const core_clap_events[] = { "double_clap", "triple_clap" };
 const int core_clap_nevents = sizeof core_clap_events / sizeof core_clap_events[0];
 static atomic_int clap_on;
+#define CLAP_OWN_TAIL_MS 500                /* after something of ours started or stopped playing: its sound is still in the room */
 int core_clap(int set)
 {
     if (set >= 0 && set != atomic_exchange(&clap_on, set != 0)) fprintf(stderr, "clap detection: switched %s\n", set ? "on" : "off");
@@ -3489,25 +3490,28 @@ static void wake_load(void)
     pthread_mutex_lock(&core_lock); wake_loaded_set(); pthread_mutex_unlock(&core_lock);
 }
 
+/* Something of the Echo's own is in the room or the mic (a reply, music, a timer, its sounds and their tails, a Drop In),
+ * or it is muted: claps are not looked for then (on_sound drops the same) */
+static int clap_blind(void)
+{
+    long long now = mono_ms();
+    return core_muted() || atomic_load(&busy) || atomic_load(&streaming) || atomic_load(&alarm_on) || atomic_load(&music_on)
+           || atomic_load(&tts_on) || atomic_load(&earcon_sounding) || atomic_load(&sounds_pending) || atomic_load(&dropin_live)
+           || now - atomic_load(&own_sound_ms) < CLAP_OWN_TAIL_MS || now < atomic_load(&earcon_heard_until);
+}
+
 static void clap_listen(const int16_t *pcm, size_t count)      /* capture thread */
 {
     static struct clap c; static int running;
     if (!atomic_load(&clap_on)) { running = 0; return; }
     if (!running) { clap_init(&c); running = 1; }
-    long long now = mono_ms();
-    int own = atomic_load(&busy) || atomic_load(&streaming) || atomic_load(&alarm_on) || atomic_load(&music_on) || atomic_load(&tts_on)
-              || atomic_load(&earcon_sounding) || atomic_load(&sounds_pending) || now - atomic_load(&own_sound_ms) < 500
-              || now < atomic_load(&earcon_heard_until) || atomic_load(&dropin_live);
     const char *why = NULL;
-    int row = clap_feed(&c, pcm, count, own, &why);
+    int row = clap_feed(&c, pcm, count, clap_blind(), &why);
     if (why) fprintf(stderr, "%s\n", why);
     if (row < 2 || row - 2 >= core_clap_nevents) return;
+    fprintf(stderr, "clap: %d in a row\n", row);
     pthread_mutex_lock(&core_lock);
-    if (core_muted()) fprintf(stderr, "clap: %d in a row, muted: not told\n", row);
-    else {
-        fprintf(stderr, "clap: %d in a row\n", row);
-        if (connected && proto->clap) proto->clap(core_clap_events[row - 2]);
-    }
+    if (!core_muted() && connected && proto->clap) proto->clap(core_clap_events[row - 2]);
     pthread_mutex_unlock(&core_lock);
 }
 
